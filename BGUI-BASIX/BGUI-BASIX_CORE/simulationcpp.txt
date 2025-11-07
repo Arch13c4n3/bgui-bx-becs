@@ -1,0 +1,333 @@
+// simple physics simul
+// micro optimizations
+// spatial partioning impl
+
+#include <iostream>
+#include <raylib.h>
+#include <vector>
+#include <string>
+#include <unordered_map>
+#include <cstdint>
+#include "core_simul_tools.hpp"
+
+void simul::simulation() {
+    BGUI::MainWindow window;
+    window.set_TargetFPS(120);
+
+    std::vector<simul::circle_prop> ball;
+    
+    std::unordered_map<int , Color> intColorMap = {
+        {1,GREEN},
+        {2,RED},  
+        {3,BLUE}
+    };
+    int blue = 0,red = 0,green = 0; // team counter
+
+    const int init_ball_count = 100;
+    int ball_count_live = 0;
+    int ball_count_prev = 0;
+    int minRadius = 20, maxRadius = 50;
+
+    auto reset_ball_count = [&]{
+        ball_count_live = init_ball_count;
+        ball_count_prev = 0;
+    };
+
+    reset_ball_count();
+    
+    auto randPos = [](int minval = 60, int maxval = 900){
+        return GetRandomValue(minval,maxval);
+    };
+
+    auto randSpeed = []{
+        return static_cast<float>(GetRandomValue(1,3));
+    };
+
+    auto randRadius = [&minRadius, maxRadius]{
+        return static_cast<float>(GetRandomValue(minRadius,maxRadius));
+    };
+
+    auto randColorTeam = [&]{
+        return GetRandomValue(1,3);
+    };
+
+    auto ball_recount_resize = [&](float radius = 0, int teamNum = 0, Vector4 pos_spread_bias = {0,0,0,0}){
+        
+        ball.resize(ball_count_live);
+
+        for (int i=ball_count_prev;i<ball_count_live;i++){
+            if (pos_spread_bias.x == 0){
+                ball[i].pos.x = randPos();
+                ball[i].pos.y = randPos();
+            }
+            else {
+                ball[i].pos.x = randPos(pos_spread_bias.x,pos_spread_bias.y);
+                ball[i].pos.y = randPos(pos_spread_bias.z,pos_spread_bias.w);
+            }
+            
+            ball[i].speed.x = randSpeed();
+            ball[i].speed.y = ball[i].speed.x;
+
+            BASIX::randVelocity(ball[i].speed,ball[i].isVelocityXInverted,ball[i].isVelocityYInverted);
+
+            if (radius == 0) ball[i].radius = randRadius();
+            else ball[i].radius = radius;
+            
+            if (teamNum == 0) 
+            {
+                ball[i].teamNum = randColorTeam();
+            }
+            ball[i].color = intColorMap[ball[i].teamNum];
+            
+            switch(ball[i].teamNum){
+                case 1: green++; break;
+                case 2: red++; break;
+                case 3: blue++; break;
+            }
+        }
+
+        ball_count_prev = ball_count_live;
+    };
+
+    auto ball_count_increase = [&](int increase = 1, float radius = 0, int teamNum = 0,Vector4 pos_spread_bias = {0,0,0,0}){
+        ball_count_live+=increase;
+        ball_recount_resize(radius,teamNum,pos_spread_bias);
+    };
+
+    auto ball_reset = [&]{
+        blue = 0,red = 0,green = 0;
+        reset_ball_count();
+        ball_recount_resize();
+        //resurrect dead mfs
+        for (int i=0; i<ball_count_live;i++ ){
+            ball[i].isDead = false;
+        }
+    };
+
+    int gameOverTrigger = 0;
+
+    auto subtract_team_counter = [&](int teamNum){
+        switch(teamNum){
+            case 1:
+            if (green > 0) green--;
+            else gameOverTrigger++;
+            break;
+            case 2: 
+            if (red > 0) red--;
+            else gameOverTrigger++;
+            break;
+            case 3:
+            if (blue > 0) blue--;
+            else gameOverTrigger++;
+            break;
+        }
+    };
+
+    int collisionCount = 0;
+
+    // space rules
+    bool hideHud = false;
+    bool toggleCollision = true;
+    bool isPaused = false;
+    bool isGridVisible = false;
+    bool isWindowThorny = false;
+    const char* toggleCollsionText[2] = {"ON", "OFF"};
+    int toggleCollisionIndex = 0;
+    float ball_circumference_right =0;
+    float ball_circumference_left = 0;
+    float ball_circumference_up = 0;
+    float ball_circumference_down = 0;
+
+    ball_recount_resize();
+
+    auto drawCircles = [&]{
+        for (int i = 0;i<ball_count_live;i++){
+            DrawCircleV(ball[i].pos,ball[i].radius, ball[i].color);
+        }  
+    };
+
+    BGUI::Pre_Render_2DTexture render;
+
+    BGUI::Grid grid(3,3,SCREEN_WIDTH,SCREEN_HEIGHT); 
+    BASIX::GridMap spaceHash(3,3);
+    
+    int wallCollision = 0;
+
+    InitAudioDevice();
+    Sound grow = LoadSound("sound_effects/cartoon-jump.mp3");
+    Sound bounce = LoadSound("sound_effects/pop-cartoon.mp3");
+
+    using namespace BASIX; 
+    
+    while (!WindowShouldClose()){
+        switch(GetKeyPressed()){
+            case KEY_SPACE: ball_count_increase(); break;
+            case KEY_ENTER: ball_reset(); break;
+            case KEY_P: isPaused = !isPaused; break;
+            case KEY_C: toggleCollisionIndex = toggleCollision = !toggleCollision; break;
+            case KEY_H: hideHud = !hideHud; break;
+            case KEY_G: isGridVisible = !isGridVisible; break;
+        }
+
+        BeginDrawing();
+            ClearBackground(BLACK);
+            
+            if (gameOverTrigger == 2){
+                DrawText("game over", 100,100,40,RED);
+            }
+            else if (!isPaused){
+                // // spatial hashing
+                // for (int i = 0;i<)
+                for (int i=0; i<ball_count_live;i++){
+                    if (ball[i].isDead){
+                        continue;
+                    }
+                    // determine if should be dead
+                    //pop fat mfs
+                    // else if (ball[i].radius >= 70){
+                    //     ball[i].color = PINK;
+                    //     // spread new balls within the circumference 
+                    //     ball_count_increase(3,30.0,ball[i].teamNum,(Vector4){ball_circumference_left,ball_circumference_up,ball_circumference_right,ball_circumference_down});
+                    //     ball[i].isDead = true;
+                    //     subtract_team_counter(ball[i].teamNum);
+                    //     continue;
+                    // }
+                    //pop smol dickheads
+                    else if (ball[i].radius < minRadius){
+                        subtract_team_counter(ball[i].teamNum);
+
+                        ball[i].isDead = true;
+                
+                        DrawCircleV(ball[i].pos,ball[i].radius,PINK);
+                        continue;
+                    }
+
+                    // ---update position----
+                    
+                    ball[i].pos.x += ball[i].speed.x;
+                    ball[i].pos.y += ball[i].speed.y;
+
+                    //--------------collision detection-----------------
+                    
+                    //entity - window collision******
+                    ball_circumference_right = ball[i].pos.x + ball[i].radius;
+                    ball_circumference_left = ball[i].pos.x - ball[i].radius;
+                    ball_circumference_up = ball[i].pos.y - ball[i].radius;
+                    ball_circumference_down = ball[i].pos.y + ball[i].radius;
+
+                    //window collision detection and thorny window
+                    if (ball_circumference_right >= SCREEN_WIDTH){
+                        ball_invert_velocity(ball[i].speed.x, ball[i].isVelocityXInverted);
+                        ball[i].pos.x -= ball_circumference_right - SCREEN_WIDTH;
+    
+                        if (isWindowThorny) ball[i].radius -= 5.0;
+                    }
+                    else if (ball_circumference_left <= 0 ){
+                        ball_invert_velocity(ball[i].speed.x, ball[i].isVelocityXInverted);
+                        ball[i].pos.x -= ball_circumference_left;
+                    }
+
+                    if (ball_circumference_down >= SCREEN_HEIGHT){
+                        ball_invert_velocity(ball[i].speed.y, ball[i].isVelocityYInverted);
+                        ball[i].pos.y -= ball_circumference_down - SCREEN_HEIGHT;
+                        
+                        if (isWindowThorny) ball[i].radius -= 5.0;
+                    }
+                    else if (ball_circumference_up <= 0 ){
+                        ball_invert_velocity(ball[i].speed.y, ball[i].isVelocityYInverted);
+                        ball[i].pos.y -= ball_circumference_up;
+                    }
+
+                    //entities collision******
+                    if (toggleCollision){
+                        for (int j = 0; j<ball_count_live;j++){
+                            if (i == j || ball[j].isDead){
+                                 continue;
+                                }
+                            else if (ball[i].isDead) {break;}
+
+                            else if (CheckCollisionCircles(ball[i].pos,ball[i].radius,ball[j].pos,ball[j].radius)){
+                                collisionCount++;
+                                PlaySound(bounce);
+                                // collision direction
+                                // left - right
+                            
+                                if (ball[i].pos.x >= ball[j].pos.x){
+                                    if (!ball[i].isVelocityXInverted && ball[j].isVelocityXInverted) {
+                                        ball_invert_velocity(ball[i].speed.x,ball[i].isVelocityXInverted);
+                                    }
+                                    else {
+                                        ball_invert_velocity(ball[i].speed.x,ball[i].isVelocityXInverted);   
+                                        ball_invert_velocity(ball[j].speed.x,ball[j].isVelocityXInverted); 
+                                    }
+                                }
+                                
+                                // bottom - top
+                                if (ball[i].pos.y >= ball[j].pos.y ){
+                                    if (!ball[i].isVelocityYInverted && ball[j].isVelocityYInverted){
+                                        ball_invert_velocity(ball[i].speed.y,ball[i].isVelocityYInverted);
+                                    }
+                                    else{
+                                        ball_invert_velocity(ball[i].speed.y,ball[i].isVelocityYInverted);
+                                        ball_invert_velocity(ball[j].speed.y,ball[j].isVelocityYInverted);
+                                    } 
+                                }
+
+                                //size bias
+                                
+                                if (ball[i].radius > ball[j].radius ){
+                                    if ( ball[i].radius < 70) {
+                                        ball[i].radius += 5.0; 
+                                        PlaySound(grow);
+                                    }
+                                    else ball[i].radius -= 5.0;
+                                    ball[j].radius -= 5.0;
+                                }
+                                else {
+                                    ball[i].radius -= 5.0; 
+                                    if ( ball[j].radius < 70) {
+                                        ball[j].radius += 5.0;
+                                        PlaySound(grow); 
+                                    } 
+                                    else ball[j].radius -= 5.0;
+                                }
+                                // else {
+                                //     ball_count_increase(3,40,ball[i].teamNum,{ball_circumference_left,ball_circumference_up,ball_circumference_right,ball_circumference_down});
+                                //     ball[i].isDead = true;
+                                //     break;
+                                // }
+                                
+                            }
+                        }
+                    }
+                    DrawCircleV(ball[i].pos,ball[i].radius, ball[i].color);
+                }   
+                render.trigger_ReRender();
+            }
+            else if (isPaused){
+                render.render_to_Texture(drawCircles);
+                render.drawStaticRenderedTexture();
+            }
+            // Draw Grid
+            if (isGridVisible) grid.drawGridTexture(simul::zeroVector2);
+
+            if (!hideHud)
+            {
+                DrawFPS(20,20);
+                DrawText(TextFormat("collision Count: %d", collisionCount), 20,45,20,WHITE);
+                //DrawText(TextFormat("Ball Count: %d", ball_count_live), 20,65,20,WHITE);
+                
+                DrawText(TextFormat("red: %d green: %d blue: %d",red,green,blue),20,85, 20, WHITE);
+                DrawText(TextFormat("gameOverTrigger: %d", gameOverTrigger),20,105, 20, WHITE);
+                DrawText(TextFormat("[p] pause , [SPACE] add ball , [ENTER] reset , [c] toggle collision %s , [h] toggle HUD Visibility", toggleCollsionText[toggleCollisionIndex]),20,860,20,WHITE);
+                DrawText(TextFormat("wall collisions: %d", wallCollision),20,115,20,WHITE);
+                DrawText("[g] Toggle Grid Visibility",20,890,20,WHITE);
+            }
+        EndDrawing();
+        
+    }
+    UnloadSound(bounce);
+    UnloadSound(grow);
+    CloseAudioDevice();
+}
+

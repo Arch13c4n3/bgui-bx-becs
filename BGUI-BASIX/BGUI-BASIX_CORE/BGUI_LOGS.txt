@@ -1,0 +1,5 @@
+[18:34:40]DEBUG MODE STARTED , FILE LOGGING IS ON
+[18:34:40]Always Clear File: FALSE
+<<INTERNAL RENDERING SYSTEM INITIALIZED!>>
+Window is Closed
+program terminated

@@ -1,0 +1,352 @@
+#include "basicGUI.hpp"
+#include "basicECS.hpp"
+#include <ranges>
+
+int main3(){
+    EditorLayer::editor();
+}
+
+// player collision 
+// ecs 
+int main4()
+{
+    BGUI::MainWindow window;
+    window.set_WindowTitle("basic ecs test");
+    window.set_TargetFPS(60); 
+    window.set_tps(20);
+    window.init_grid_space(10,10);
+
+    // BGUI::Button button({{210.0f,500.0f},100.0f,100.0f});
+    // BGUI::Button button2({{300.0f,500.0f},100.0f,100.0f});
+
+    //Vector2 pos = {500.0f,500.0f};
+    //Vector2 dest = {900.0f,600.0f};
+
+    // auto interpolate_position = [&](const float& pA, const float& pB, const float& time_traversal){
+    //     float d = std::abs(pA - pB);
+    //     float s = time_traversal * window.Fps;
+    //     return (d / s) * d;
+    // };
+
+    // float speed = interpolate_position(pos.x,dest.x,20.0f);
+
+    // float speed_dt = 0.0f;
+
+    // struct circle_t {
+    //     std::vector<Vector2> pos;
+    //     std::vector<float> radius;
+    //     std::vector<Vector2> speed;
+    //     //std::vector<Color> color;
+
+    //     void addCircle(Vector2 pos, float radius){
+    //         this->pos.push_back(pos);
+    //         this->radius.push_back(radius);
+    //         //this->speed.push_back(speed);
+    //     }
+
+    //     void drawCircles(){
+    //         for (const auto& [p,r] : std::views::zip(this->pos,this->radius)){
+    //             DrawCircleV(p,r,WHITE);
+    //         }
+    //     }
+
+    //     bool doGravity = false;
+
+    //     void updateCircles(){
+    //         if (doGravity){
+    //             for (const auto& [p,r] : std::views::zip(this->pos,this->radius)){
+    //                 if (p.y+r < 1000) p.y += 9.6f;
+    //             }
+    //         }
+            
+    //     }
+    // };
+
+    // const int max = 10000;
+
+    // struct circle_t {
+    //     Vector2 pos[max];
+    //     float radius[max];
+    //     int counter = 0;
+    //     Color color[max];
+
+    //     void addCircle(Vector2 pos, float radius){
+    //         if (counter <= max){
+    //             if (counter % 2 == 0) color[counter] = RED;
+    //             else if (counter % 3 == 0) color[counter] = BLUE;
+    //             else if (counter % 5 == 0) color[counter] = GREEN;
+    //             else if (counter % 7 == 0) color[counter] = WHITE;
+    //             else if (counter % 11 == 0) color[counter] = SKYBLUE;
+    //             else if (counter % 13 == 0) color[counter] = PURPLE;
+    //             else color[counter] = PINK;
+    //             this->pos[counter] = pos;
+    //             this->radius[counter] =  radius;
+    //             counter++;
+    //         }
+    //         //this->speed.push_back(speed);
+    //     }
+
+    //     int restingObjects = 0;
+
+    //     void drawCircles(){
+    //         if (counter < max){
+    //             for (int i = 0;i<counter;i++){
+    //                 DrawCircleV(this->pos[i],this->radius[i],this->color[i]);
+    //             }
+    //         }
+            
+    //     }
+
+    //     bool doGravity = false;
+        
+    //     void updateCircles(){
+    //         if (doGravity && counter < max){
+    //             for (int i = restingObjects;i<counter;i++){
+    //                 if (pos[i].y+radius[i] < 1000) pos[i].y += 9.6f;
+    //                 else ++restingObjects;
+    //             }
+    //         }
+    //     }
+    // };
+
+    // circle_t circles;
+    // circles.doGravity = true;
+
+    bool start = false;
+
+    auto logic = [&]{  
+        // if (IsKeyPressed(KEY_SPACE))
+        // {
+        //     start = !start;
+        // }
+
+        // if (start){
+        //     circles.addCircle(GetMousePosition(),20);
+            
+        // }
+        
+        // circles.updateCircles();
+
+        if (IsKeyPressed(KEY_SPACE))
+        {
+            start = !start;
+        }
+
+        if (start)
+        {
+            
+        }
+        
+    };
+
+    auto draw = [&]{
+        ClearBackground(BLACK);
+        // DrawText(TextFormat("current frame time: %f", window.c_frame_time),100.0f,100.0f,30,WHITE);
+        // DrawText(TextFormat("tick: %d", window.activeTick),100.0f,200.0f,30,WHITE);
+        // DrawText(TextFormat("accumulated tick: %d", window.accumulated_tick),100.0f,300.0f,30,WHITE);
+        // DrawText(TextFormat("max frame time: %f", window.max_frame_time),100.0f,400.0f,30,WHITE);
+        // DrawText(TextFormat("interpolated speed per frame: %f", speed),100.0f,500.0f,30,WHITE);
+        // DrawText(TextFormat("delta: %f", speed_dt),100.0f,560.0f,30,WHITE);
+        //circles.drawCircles();
+        //DrawText(TextFormat("circle count: %d", circles.pos.size()),100,100,20,WHITE);
+        //DrawText(TextFormat("circle count: %d", circles.counter),100,100,20,WHITE);
+        //DrawCircleV(pos,20,RED);
+        DrawFPS(100,200);
+    };
+
+    window.running(logic,draw);
+    
+    return 0;
+}
+
+// parser test
+int main2(){ 
+    BGUI::MainWindow window;
+    window.set_WindowTitle("basic design language test");
+    BGUI::BDL bdl("test.txt");
+    while(!WindowShouldClose()){
+        BeginDrawing();
+        window.DRAWGUI();
+        EndDrawing();
+    }
+    return 0;
+}
+
+bool CheckCollisionCircleRec1(Vector2 center, float radius, Rectangle rec)
+{
+    float recHalfW = rec.width/2.0f;
+    float recHalfH = rec.height/2.0f;
+
+    float recCenterX = rec.x + recHalfW;
+    float recCenterY = rec.y + recHalfH;
+
+    float dx = std::abs(center.x - recCenterX);
+    float dy = std::abs(center.y - recCenterY);
+
+    if (dx > (recHalfW + radius)) { return false; }
+    if (dy > (recHalfH + radius)) { return false; }
+
+    if (dx <= recHalfW) { return true; }
+    if (dy <= recHalfH) { return true; }
+
+    float cornerDistanceSq = (dx - recHalfH)*(dx - recHalfW) +
+                             (dy - recHalfH)*(dy - recHalfH);
+
+    return (cornerDistanceSq <= (radius*radius));
+}
+
+int main1(){
+    //simul::simulation();
+    BGUI::MainWindow window;
+    //window.set_TargetFPS(60);
+    window.set_WindowTitle("BGUI TEST");
+    window.set_TargetFPS(120);
+
+    auto randPos = [](int minval = 60, int maxval = 390){
+        Vector2 vec = {static_cast<float>(GetRandomValue(minval,maxval)),static_cast<float>(GetRandomValue(minval,maxval))};
+        return vec;
+    };
+
+    auto randSpeed = []{
+        return static_cast<float>(GetRandomValue(100,200));
+    };
+
+    using namespace BGUI;
+
+    struct circle_t {
+        std::vector<Vector2> pos;
+        std::vector<float> radius;
+        std::vector<Vector2> speed;
+        //std::vector<Color> color;
+    };
+
+    circle_t circle;
+    const int num = 1;
+
+    float radius1 = 20.0f;
+
+    auto set_circles = [&]{
+        circle.pos.resize(num);
+        circle.radius.resize(num);
+        circle.speed.resize(num);
+        for (int i = 0;i < num;i++){
+            circle.pos[i] = randPos();
+            circle.radius[i]=radius1;
+            float speed_ = 600.0f;
+            circle.speed[i] = {speed_,speed_};
+        }
+    };
+
+    Vector2 circumference_p ;
+    Vector2 circumference_n ;
+    Vector2 circumference_p2 ;
+    Vector2 circumference_n2 ;
+
+    auto increment_Vector2 = [](Vector2& vec, const Vector2& vec_increment ,const float& dt){
+        vec.x += vec_increment.x * dt;
+        vec.y += vec_increment.y * dt;
+    };
+
+    auto flip_velocity = [](float& speed){
+        speed *= -1;
+    };
+
+    Rectangle rect = {400.0f,400.0f,200.0f,200.0f};
+
+    Vector2 center = {rect.x + (rect.width/2.0f) ,rect.y + (rect.height/2.0f)};
+    Vector2 edge_left = {center.x - (rect.width / 2.0f), center.y};
+    Vector2 edge_right = {center.x + (rect.width /2.0f),center.y};
+    Vector2 edge_top = {center.x , center.y - (rect.height /2.0f)};
+    Vector2 edge_bottom = {center.x ,center.y + (rect.height/2.0f)};
+    Vector2 top_left = {rect.x,rect.y};
+    Vector2 top_right = {rect.width + rect.x,rect.y};
+    Vector2 bottom_left = {rect.x,rect.y+rect.height};
+
+    float dt;
+
+    set_circles();
+
+    while(!WindowShouldClose())
+    {
+        dt = GetFrameTime();
+
+        switch(GetCharPressed()){
+            case KEY_SPACE: set_circles(); break;
+        }
+
+        for (size_t i = 0;i < circle.pos.size(); i++)
+        {
+            circle.speed[i].x ;
+            circle.speed[i].y ;
+            circumference_p = {circle.pos[i].x + circle.radius[i],circle.pos[i].y + circle.radius[i]};
+            circumference_n = {circle.pos[i].x - circle.radius[i],circle.pos[i].y - circle.radius[i]};
+
+            if ((circumference_p.x >= window.Width) || (circumference_n.x <= 0.0f)) flip_velocity(circle.speed[i].x);
+            if ((circumference_p.y >= window.Height) || (circumference_n.y <= 0.0f)) flip_velocity(circle.speed[i].y);
+            
+            if (CheckCollisionCircleRec1(circle.pos[i],circle.radius[i],rect)){
+                if (circumference_p.x >= rect.x)
+                {   
+                    flip_velocity(circle.speed[i].x); 
+                }
+                if (circumference_p.y >= rect.y)
+                {
+                    flip_velocity(circle.speed[i].y);
+                }
+ 
+                //else if ( circumference_n.y <= bottom_left.y || circumference_n.y >= bottom_left.y) flip_velocity(circle.speed[i].y); 
+
+                //if (circumference_n.x >= top_right.x && circumference_n.x <= rect.x)
+            }
+
+            for (size_t f = 0; f < circle.pos.size(); f++)
+            {
+                if (i == f) continue;
+                const Vector2& pos2 = circle.pos[f];
+                circumference_p2 = {pos2.x + circle.radius[f],pos2.y + circle.radius[f]};
+                circumference_n2 = {pos2.x - circle.radius[f],pos2.y - circle.radius[f]};
+                if (CheckCollisionCircles(circle.pos[i],circle.radius[i],pos2,circle.radius[i])){
+                    if (circumference_p.x >= circumference_n2.x || circumference_n.x <= circumference_p2.x){
+                        flip_velocity(circle.speed[i].x); 
+                    }
+                    if (circumference_p.y >= circumference_n2.y || circumference_n.y <= circumference_p2.y){
+                        flip_velocity(circle.speed[i].y); 
+                    } 
+                    break;
+                }
+            }
+
+            increment_Vector2(circle.pos[i],circle.speed[i],dt);
+        }
+
+        BeginDrawing();
+        ClearBackground(BLACK);
+
+        for (size_t i = 0;i<circle.pos.size();i++){
+            DrawCircleV(circle.pos[i],circle.radius[i],WHITE);
+        }
+
+        //DrawText(TextFormat("pos: %f,%f",circle.pos[0].x,circle.pos[0].y),500,500,20,WHITE);
+            
+        DrawCircleV(center,5.0f,BLUE);
+        DrawCircleV(edge_left,5.0f,BLUE);
+        DrawCircleV(edge_right,5.0f,BLUE);
+        DrawCircleV(edge_top,5.0f,BLUE);
+        DrawCircleV(edge_bottom,5.0f,BLUE);
+        DrawCircleV(top_left,5.0f,BLUE);
+        DrawCircleV(top_right,5.0f,BLUE);
+        DrawCircleV(bottom_left,5.0f,BLUE);
+
+
+        DrawCircleV(circumference_p,5.0f,BLUE);
+        DrawCircleV(circumference_n,5.0f,BLUE);
+
+        DrawRectangleLinesEx(rect,2,WHITE);
+
+        window.DRAWGUI();
+        DrawFPS(10,20);
+   
+        
+        EndDrawing();
+    }    return 0;
+}

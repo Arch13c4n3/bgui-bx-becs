@@ -1,0 +1,153 @@
+// how bgui parser works
+// scans file for keywords such as ( # , @ , [ )
+// -gets the line number of declaration for debugging purposes
+// maps keywords to syntax table
+// and creates a virtual model
+
+//basic design language syntax
+// uses px(pixels) as measurements.
+// lifetimes: components and other definitions will only take effect / show, once they are in an active scene.
+//  components defined globally needs to be invoked in a scene to be rendered when that scene is active.
+//  components without labels are still valid but cannot be accessed/modified by .cpp files
+//      and it's properties cannot be inherited
+
+// ------syntax-------
+
+// '#background <color>' <- applies color to the whole window, default white
+
+#background red 
+#background white // overrides previous declarations
+
+// shapes 
+#rectangle <label> {<x,y,width,height>}
+#rectangle rect1 {10,10,40,40}
+#circle <label> <x,y,radius>
+#circle circle1 {12,12,20}
+
+// components and property sharing
+// component definition 
+#<component type> <label> {
+    // property definiton
+}
+
+// positions can be defined as align (alignment relative to window) or absolute value (x,y)
+
+#button b0 {
+    align top_left
+}
+
+#button b1 {
+    x 20,
+    y 20,
+    width 100,
+    height 200,
+    text{ // <- default centered alignment
+        "press this cute button",
+    }  
+    text {
+        align left // <- sets text alignment to left of inside the button 
+        "fuck that shit",
+    }
+}
+
+#b1 b2 { // <- b2 inherits b1 properties
+    x 50, // <- overrides b1's x,y values
+    y 100
+}
+
+// containers can have components defined in the 
+// the components defined will be positioned relative to container properties
+#container c {
+    padding 10
+    font_size 20
+    text "fuck you"
+    #button button_po_ito {
+
+    }
+    #button_po_ito button_yarn {
+
+    }
+}
+
+// ---- advanced syntax -----
+
+// segments  - allows for conditional rendering / maybe animations
+// - everytime a segment is defined -> parser adds a listener to the event listener queue stack
+//  ^managed by the event system -> removes the event listener from the stack if component is inactive
+// definiton: '[<segment condition properties>...]' uses ( | , & ) operators
+// if segment condition properties defined are true then the definitions bellow will take effect
+// executes all the stuff defined below it until another segment
+// segment properties:
+// time_elapsed <specified seconds - hours>
+
+[time elapsed 5s | b1 clicked]  // <- definitions below the segment definition will execute if one of conditions are met
+{ #background red } // <- background turns to red after 5 seconds has elapsed or if b1 clicked is true
+
+[b1 clicked & b2 clicked] { // <- both have to be true 
+    [clicked] // <- error: !INVALID SYNTAX at line .. [event] not in component scope | does not follow a component label
+
+    #background blue 
+}
+
+#b2 , b3 b4 { // <- multiple bases , if all bases have the same property assigned 
+              // default derives value from left most base defined
+    [clicked] { // <- segments inside component
+        color red,
+        x ++ 42  // <- overrides once then increments on every click 
+        y b2.y ++ 13 // <- uses the y value of base b2 then increments it 
+        extend y // <- extends access of base property in current scope
+    }
+}
+
+// -- scenes --
+// - used for routing / navigation
+// - can only be created outside a scope
+// syntax: <<scene label>> 
+// navigation: goto <scene label>
+// entry point: <_>
+
+#button abc {
+    x 100
+    y 20
+}
+
+<_> {
+
+    abc{}
+
+    #button newbutton {
+        text "fuck this button"
+        [clicked] {
+            text "button fucked"
+            [time elapsed 3s] {
+                goto secondPage
+            }
+        }
+    }
+    #button abutton {
+        [clicked]{
+            goto thirdPage
+        }
+    }
+}
+
+<secondPage> {
+    #container {
+
+    }
+
+    #container abc {
+
+    }
+
+    #button b1 {
+        [clicked]
+        {
+            goto mainPage
+        }
+    }
+}
+
+
+
+
