@@ -1,0 +1,15 @@
+HOW IT WORKS & design decisions
+
+BECS:
+    uses 'entity_SOA_t' as the base ecs
+    - designed for contiguous memory
+    - built in handles for spatial partioning/hashing systems
+
+spatial partioning:
+-> each entity should be registered upon creation via: 'register_entity'
+    which hashes the bounding box to the grid space 
+
+-> update registered entity bounding box if the entity changes its size or position
+    to ensure optimal collision checks via: 'update_entity_grid_position'
+
+-> 
