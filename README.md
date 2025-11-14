@@ -6,4 +6,5 @@ bx - basic physics - light weight physics solver - not implemented
 
 becs - basic ecs - implemented entity_SOA_t with built in spatial hashing and handles
 
+these headers are designed to be self contained with seemeless interoptability 
 
