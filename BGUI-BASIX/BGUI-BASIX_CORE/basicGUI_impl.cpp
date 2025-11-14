@@ -73,12 +73,16 @@ void BGUI::INTERNAL_RENDERING_SYSTEM::Init_GUI_Grid_Space(int rows, int cols)
     }
 }
 
-int BGUI::INTERNAL_RENDERING_SYSTEM::Get_Point_Grid_Position(Vector2 point)
+inline int BGUI::INTERNAL_RENDERING_SYSTEM::Get_Point_Grid_Position(Vector2 point)
 {
-    cached_Grid_Point = static_cast<int>(point.y / this->cellHeight) * this->Rows + static_cast<int>(point.x / this->cellWidth);
-    if (cached_Grid_Point > this->GUI_GRID_SIZE) return (this->GUI_GRID_SIZE - 1);
-    else if (cached_Grid_Point < 0) return 0;
-    else return cached_Grid_Point;
+    //SOMETIMES manual is faster than std clamp (0.018ms < 0.033ms) but sometimes clamp is faster (0.021ms > 0.018ms).. idk
+
+    // int cell_Point = static_cast<int>(point.y / this->cellHeight) * this->Rows + static_cast<int>(point.x / this->cellWidth);
+    // if (cell_Point > this->GUI_GRID_SIZE) return (this->GUI_GRID_SIZE - 1);
+    // else if (cell_Point < 0) return 0;
+    // else return cell_Point;
+
+    return std::clamp(static_cast<int>(point.y / this->cellHeight) * this->Rows + static_cast<int>(point.x / this->cellWidth),0,this->GUI_GRID_SIZE - 1);
 }
 
 void BGUI::INTERNAL_RENDERING_SYSTEM::Overlay_Rendered_Texture()
@@ -88,83 +92,85 @@ void BGUI::INTERNAL_RENDERING_SYSTEM::Overlay_Rendered_Texture()
         this->isBLUEPRINTS_HASHED = true;
     }
 
-    this->mousePosition = GetMousePosition();
-    this->mouse_Grid_Position_Index = Get_Point_Grid_Position(this->mousePosition);
-    this->current_id_stack_size_Buffer = static_cast<int>(Grid_Id_Index_Stack[mouse_Grid_Position_Index].size());
+    Vector2 mousePosition = GetMousePosition();
+    this->mouse_Grid_Position_Index = Get_Point_Grid_Position(mousePosition);
 
     if ( prevMGPI != mouse_Grid_Position_Index)
     {
+        this->current_id_stack_size_Buffer = static_cast<int>(Grid_Id_Index_Stack[mouse_Grid_Position_Index].size());
         this->prevMGPI = mouse_Grid_Position_Index;
         
         if (current_id_stack_size_Buffer > 0){
-            LOG.log_Text(TextFormat("currently accessing mouse_Grid_Position_Index: %d, id_stack_size: %d",mouse_Grid_Position_Index, current_id_stack_size_Buffer)); 
+            bgui_log_text(TextFormat("currently accessing mouse_Grid_Position_Index: %d, id_stack_size: %d",mouse_Grid_Position_Index, current_id_stack_size_Buffer)); 
         }
     }
-    if (current_id_stack_size_Buffer > 0 && !isMouseHovering_Component){
+
+    if (current_id_stack_size_Buffer > 0 /*&& !isMouseHovering_Component*/)
+    {
         //hover checks only on rects present in the cell
         for (int i = 0 ; i < current_id_stack_size_Buffer ;i++)
         {
             // currently uses id as index for blueprint stack, might revise soon
             this->blueprintBuffer = INTERNAL_RENDERING_INSTANCE.BLUEPRINT_STACK.at(Grid_Id_Index_Stack[mouse_Grid_Position_Index][i]);
-            if(CheckCollisionPointRec(this->mousePosition,blueprintBuffer->componentProp->rect))
+            if(CheckCollisionPointRec(mousePosition,blueprintBuffer->componentProp->rect))
             { 
-                // temp solution.. inefficient
+                // temp solution.. inefficient.. waste cpu cycles. maybe
                 this->blueprintBuffer->renderBody.Hovered();
+                //isMouseHovering_Component = true;
                 
                 if(IsMouseButtonDown(MOUSE_BUTTON_LEFT)) blueprintBuffer->renderBody.Clicked();
-                else if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) blueprintBuffer->signal_event(Signal::CLICKED);
+                else if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)){
+                    blueprintBuffer->signal_event(Signal::CLICKED);
+                    
+                } 
 
-                // debug
-                DrawText("mouse is hovering",1,500,20,YELLOW);
-                DrawText(TextFormat("blueprintBuffer.id: %d",blueprintBuffer->id),1,290,20,YELLOW);
-                DrawText(TextFormat("mgpi: %d",mouse_Grid_Position_Index),1,200,20,YELLOW);
-                DrawText(TextFormat("Grid_Id_Index_Stack size: %d",Grid_Id_Index_Stack[mouse_Grid_Position_Index].size()),1,230,20,YELLOW);
-                DrawText(TextFormat("current_id_stack_size_Buffer: %d",current_id_stack_size_Buffer),1,260,20,YELLOW);
+                // -- debug --
+                // DrawText("mouse is hovering",1,500,20,YELLOW);
+                // DrawText(TextFormat("blueprintBuffer.id: %d",blueprintBuffer->id),1,290,20,YELLOW);
+                // DrawText(TextFormat("mgpi: %d",mouse_Grid_Position_Index),1,200,20,YELLOW);
+                // DrawText(TextFormat("Grid_Id_Index_Stack size: %d",Grid_Id_Index_Stack[mouse_Grid_Position_Index].size()),1,230,20,YELLOW);
+                // DrawText(TextFormat("current_id_stack_size_Buffer: %d",current_id_stack_size_Buffer),1,260,20,YELLOW);
             }
         }
     }
 
     // displays current mouse index rect, debug purposes
     DrawRectangleLinesEx(this->cellRect_stack[mouse_Grid_Position_Index],3,BLUE);
-    DrawText(TextFormat("mouse: %f,%f", mouseDelta.x,mouseDelta.y),500,40,20,SKYBLUE);   
-    DrawText(TextFormat("mouse delta: %.2f,%.2f", mousePosition.x,mousePosition.y),500,10,20,SKYBLUE);
+    // DrawText(TextFormat("mouse: %f,%f", mouseDelta.x,mouseDelta.y),500,40,20,SKYBLUE);   
+    // DrawText(TextFormat("mouse delta: %.2f,%.2f", mousePosition.x,mousePosition.y),500,10,20,SKYBLUE);
 }
 
 void BGUI::INTERNAL_RENDERING_SYSTEM::HASH_BLUEPRINTS_TO_GRID()
 {
     this->Grid_Id_Index_Stack.resize(this->GUI_GRID_SIZE);
     LOG.log_Text(TextFormat("[HASH_BLUEPRINTS_TO_GRID] Grid_Id_Index resized, new size:%d",GUI_GRID_SIZE));
-    int p1 = 0, p2 = 0 , p1_adj = 0, p2_adj = 0 ,  p1_adj_d = 0/*distance of p1 to its adj*/;
-    Vector2 p_buffer = {0.0f,0.0f};
     
     {// sample all blue prints' rects
+        int p1 = 0,p1_adj = 0,p2_adj = 0, p1_adj_d = 0;
+
         BGUI::ScopedTimer timer("INTERNAL_RENDERING_SYSTEM::HASH_BLUEPRINTS_TO_GRID");
+
         for (int f = 0;f<INTERNAL_RENDERING_INSTANCE.BLUEPRINT_STACK_SIZE;f++)
         {
-            int emptyChecks = 0;
-
             p1 = Get_Point_Grid_Position(INTERNAL_RENDERING_INSTANCE.BLUEPRINT_STACK[f]->componentProp->position);
-            p_buffer = {
-                INTERNAL_RENDERING_INSTANCE.BLUEPRINT_STACK[f]->componentProp->rect.x + INTERNAL_RENDERING_INSTANCE.BLUEPRINT_STACK[f]->componentProp->rect.width,
+            p1_adj = Get_Point_Grid_Position({
+                INTERNAL_RENDERING_INSTANCE.BLUEPRINT_STACK[f]->componentProp->rect.x + INTERNAL_RENDERING_INSTANCE.BLUEPRINT_STACK[f]->componentProp->rect.width , 
+                INTERNAL_RENDERING_INSTANCE.BLUEPRINT_STACK[f]->componentProp->position.y
+            });
+            p2_adj = Get_Point_Grid_Position({
+                INTERNAL_RENDERING_INSTANCE.BLUEPRINT_STACK[f]->componentProp->position.x ,
                 INTERNAL_RENDERING_INSTANCE.BLUEPRINT_STACK[f]->componentProp->rect.y + INTERNAL_RENDERING_INSTANCE.BLUEPRINT_STACK[f]->componentProp->rect.height
-            };
-            p2 = Get_Point_Grid_Position(p_buffer);
-            p1_adj = Get_Point_Grid_Position({p_buffer.x , INTERNAL_RENDERING_INSTANCE.BLUEPRINT_STACK[f]->componentProp->position.y});
-            p2_adj = Get_Point_Grid_Position({INTERNAL_RENDERING_INSTANCE.BLUEPRINT_STACK[f]->componentProp->position.x , p_buffer.y}); 
+            }); 
+            p1_adj_d = p1_adj - p1;
 
-            LOG.log_Text(TextFormat("Currently Hashing id: %d to Points p1: %d , p2: %d",INTERNAL_RENDERING_INSTANCE.BLUEPRINT_STACK[f]->id, p1,p2));
-
-            // with empty checks sampling , will optimized further soon
-            for (int i = p1; i <= p2; i++)
-            {
-                if (CheckCollisionRecs(INTERNAL_RENDERING_INSTANCE.BLUEPRINT_STACK[f]->componentProp->rect,cellRect_stack[i]))
+            //LOG.log_Text(TextFormat("Currently Hashing id: %d to Points p1: %d",INTERNAL_RENDERING_INSTANCE.BLUEPRINT_STACK[f]->id, p1));
+            
+            for (int i = 0; i < p1_adj_d; i++){
+                for (int i2 = p1 + i; i2 < p2_adj; i2 += this->Rows)
                 {
-                    LOG.log_Text(TextFormat("Hashed. point %d",i));
-                    this->Grid_Id_Index_Stack.at(i).push_back(INTERNAL_RENDERING_INSTANCE.BLUEPRINT_STACK[f]->id);
+                    this->Grid_Id_Index_Stack[i2].emplace_back(INTERNAL_RENDERING_INSTANCE.BLUEPRINT_STACK[f]->id);
                 }
-                else emptyChecks++;
-            } 
-            LOG.log_Text(TextFormat("emptyChecks: %d",emptyChecks));
+            }
         }
     }
 
@@ -189,16 +195,16 @@ void BGUI::INTERNAL_RENDERING_SYSTEM::push_to_task_stack(task_t& task)
 
 void BGUI::MainWindow::DRAWGUI()
 {
-    // if (!this->isGUI_BATCHED) {
-    //     INTERNAL_RENDERING_INSTANCE.BATCH_RENDER_BLUEPRINTS();
-    //     this->isGUI_BATCHED = true;
-    // }
-    // else [[likely]] {
-    //     DrawTextureRec(
-    //         INTERNAL_RENDERING_INSTANCE.BATCHED_RENDERED_BLUEPRINTS.texture,
-    //         this->GUI_TEXTURE_SURFACE_PROPERTIES.source,{0.0f,0.0f},WHITE
-    //     );
-    // }
+    if (!this->isGUI_BATCHED) {
+        INTERNAL_RENDERING_INSTANCE.BATCH_RENDER_BLUEPRINTS();
+        this->isGUI_BATCHED = true;
+    }
+    else [[likely]] {
+        DrawTextureRec(
+            INTERNAL_RENDERING_INSTANCE.BATCHED_RENDERED_BLUEPRINTS.texture,
+            this->GUI_TEXTURE_SURFACE_PROPERTIES.source,{0.0f,0.0f},WHITE
+        );
+    }
     
     INTERNAL_RENDERING_INSTANCE.Overlay_Rendered_Texture();
 
@@ -281,28 +287,6 @@ BGUI::MainWindow::~MainWindow(){
     onWindowClose();
 }
 
-BGUI::Sound_effect::Sound_effect(const char* sound_path)
-{
-    if (Sound_effect::isAudioDeviceReady == false) {
-        InitAudioDevice();
-        Sound_effect::isAudioDeviceReady = true;
-    }
-    this->sound = LoadSound(sound_path);
-}
-
-bool BGUI::Sound_effect::isAudioDeviceReady = false;
-
-BGUI::Sound_effect::~Sound_effect()
-{
-    UnloadSound(this->sound);
-    Sound_effect::isAudioDeviceReady = false;
-}
-
-void BGUI::Sound_effect::play()
-{
-    PlaySound(this->sound);
-}
-
 void BGUI::MainWindow::onWindowClose()
 {
     LOG.log_Text("Window is Closed");
@@ -311,19 +295,6 @@ void BGUI::MainWindow::onWindowClose()
 void BGUI::MainWindow::init_grid_space(int rows, int cols)
 {
     INTERNAL_RENDERING_INSTANCE.Init_GUI_Grid_Space(rows,cols);
-}
-
-void BGUI::MainWindow::canvas(std::function<void()> drawingLogic)
-{
-    while(!WindowShouldClose()){
-        if (isTickSet) update_tick_clock();
-        if (this->logic != nullptr) this->logic();
-        BeginDrawing();
-        if (INTERNAL_RENDERING_INSTANCE.BLUEPRINT_STACK_SIZE > 0) DRAWGUI();
-        else ClearBackground(BLACK);
-        if (drawingLogic != nullptr) drawingLogic();
-        EndDrawing();
-    }
 }
 
 void BGUI::MainWindow::checkGUI_batched_status()
@@ -360,6 +331,27 @@ void BGUI::MainWindow::update_perTick(const int& tickSpeed, std::function<void()
     if (this->accumulated_tick % tickSpeed == 0) logic();
 }
 
+BGUI::Sound_effect::Sound_effect(const char* sound_path)
+{
+    if (Sound_effect::isAudioDeviceReady == false) {
+        InitAudioDevice();
+        Sound_effect::isAudioDeviceReady = true;
+    }
+    this->sound = LoadSound(sound_path);
+}
+
+bool BGUI::Sound_effect::isAudioDeviceReady = false;
+
+BGUI::Sound_effect::~Sound_effect()
+{
+    UnloadSound(this->sound);
+    Sound_effect::isAudioDeviceReady = false;
+}
+
+void BGUI::Sound_effect::play()
+{
+    PlaySound(this->sound);
+}
 
 //----------UI-----------//
 // will be moved to different impl file
@@ -407,36 +399,6 @@ bool BGUI::BluePrint_t::is_event_triggered(Signal signal)
         return this->eventBody->isOnClick_Triggered;
     default: LOG.log_Text("INVALID SIGNAL STATE TO TRIGGER"); return false;
     }
-}
-
-BGUI::Grid::Grid(grid_prop_t grid_properties)
-{
-    float cellWidth = grid_properties.layout_width / grid_properties.rows;
-    float cellHeight = grid_properties.layout_height / grid_properties.columns;
-
-    //calculate cells
-    for (int i = 0; i < grid_properties.columns;i++){
-        for (int j = 0;j< grid_properties.rows;j++){
-            this->gridBuffer.push_back({j * cellWidth,i * cellHeight, cellWidth , cellHeight});  
-        }
-    }
-
-    //draw on texture
-    gridRenderTexture = LoadRenderTexture(grid_properties.layout_width,grid_properties.layout_height);
-    BeginTextureMode(gridRenderTexture);
-    ClearBackground(BLANK);
-    for (int i = 0;i <grid_properties.rows*grid_properties.columns;i++){
-        DrawRectangleLinesEx(gridBuffer[i],grid_properties.border_line_thickness,WHITE);
-    }
-    EndTextureMode();
-}
-
-void BGUI::Grid::drawGridTexture(const Vector2& pos){
-    DrawTextureV(gridRenderTexture.texture,pos,WHITE);
-}
-
-BGUI::Grid::~Grid(){  
-    UnloadRenderTexture(gridRenderTexture);
 }
 
 bool BGUI::compare_Colors(Color a ,Comparison comp, Color b){
