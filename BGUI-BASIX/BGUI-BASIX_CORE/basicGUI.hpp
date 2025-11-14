@@ -49,13 +49,6 @@
 #include <map>
 #include <ranges>
 
-//not implemented yet
-// #ifdef DEBUG
-//     #define log_text(text) BGUI::LOG.log_text(text)
-// #else 
-//     #define log_text(text) ((void)0)
-// #endif
-
 namespace BGUI {
     class Button;
     class Component_prop_t;
@@ -141,6 +134,14 @@ namespace BGUI {
 
     inline Text_File_Logger LOG;
 
+    //not implemented yet
+    #ifdef BGUI_DEBUG_MODE 
+        //#error "DEBUG MODE ACTIVE"
+        #define bgui_log_text(text) ::BGUI::LOG.log_text(text)
+    #else
+        #define bgui_log_text(text) ((void)0)
+    #endif
+
     // buggy
     class Timer {
         public:
@@ -188,7 +189,7 @@ namespace BGUI {
         float width;
         float height;
         // where the assembled rect is stored
-        Rectangle rect;
+        Rectangle rect = zeroRectangle;
         // assembles the rect member using other members
         void assemble_Rect(){
             this->rect = {this->position.x,this->position.y,this->width,this->height};
@@ -309,7 +310,6 @@ namespace BGUI {
         size_t RENDERED_BLUEPRINTS_OVERLAY_STACK_SIZE;
         // draw pre rendered
         void BATCH_RENDER_BLUEPRINTS();
-        Vector2 mousePosition;
 
         //---- parser interfacing ------
 
@@ -340,8 +340,7 @@ namespace BGUI {
         int prevMGPI;
         // determines the position of a point in the GUI grid space
         // returns the index position
-        int Get_Point_Grid_Position( Vector2 point);
-        int cached_Grid_Point = 0;
+        inline int Get_Point_Grid_Position(Vector2 point);
         // draws the overlays for displaying different states
         // responsible for determining which component to draw in the stack 
         // heavily optimized by only updating checks for cell access changes and mouse movement
@@ -402,8 +401,26 @@ namespace BGUI {
         void init_grid_space(int rows = 10, int cols = 10);
 
         // manages game loop logic and drawing
-        std::function<void()> logic = nullptr;
-        void canvas(std::function<void()> drawingLogic);
+        std::function<void()> logic;
+
+        template<typename fn_drawingLogic>
+        void canvas(fn_drawingLogic&& drawingLogic){
+            this->canvas_impl(this->logic,std::forward<fn_drawingLogic>(drawingLogic));
+        }
+
+        template<typename fn_logic, typename fn_drawingLogic>
+        void canvas_impl(fn_logic&& logic, fn_drawingLogic&& drawingLogic){
+            while(!WindowShouldClose())
+            {
+                if (isTickSet) this->update_tick_clock();
+                if (logic) logic();
+                BeginDrawing();
+                if (INTERNAL_RENDERING_INSTANCE.BLUEPRINT_STACK_SIZE > 0) this->DRAWGUI();
+                else ClearBackground(BLACK);
+                drawingLogic();
+                EndDrawing();
+            }
+        }
 
         task_t isGUI_BATCHED_task;
         void checkGUI_batched_status();
@@ -425,6 +442,9 @@ namespace BGUI {
         // logic that updates per specified tick
         void update_perTick(const int& tickSpeed, std::function<void()> logic);
         //void interpolate_position(Vector2& start, Vector2 end, int tick);     
+
+        private:
+        
     };
 
     class Sound_effect {
@@ -445,24 +465,6 @@ namespace BGUI {
         BluePrint_t default_BluePrint; 
         // custom events
         eventBody_t eventBody;
-    };
-
-    struct grid_prop_t {
-        int rows, columns;
-        float layout_width, layout_height; // whole surface area of the grid
-        int border_line_thickness = 1;
-    };
-
-    // grid space for gui and entities
-    class Grid {
-        public:
-        Grid(grid_prop_t grid_properties); //define calculate grid & draw on texture 
-        ~Grid(); // unload textures
-        std::vector<Rectangle> gridBuffer; // contains each cells rects dimensions
-        void drawGridTexture(const Vector2& pos);
-
-        private:
-        RenderTexture2D gridRenderTexture;
     };
     
     struct text_prop_t {
