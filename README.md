@@ -4,6 +4,6 @@ BGUI - basic gui - super fast minimal gui library for multi state components - s
 
 bx - basic physics - light weight physics solver - not implemented
 
-becs - basic ecs - not implemented
+becs - basic ecs - implemented entity_SOA_t with built in spatial hashing and handles
 
 
