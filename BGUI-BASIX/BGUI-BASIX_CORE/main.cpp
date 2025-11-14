@@ -1,4 +1,6 @@
+#define BGUI_DEBUG_MODE
 #include "basicGUI.hpp"
+#include "basicECS.hpp"
 
 using namespace BGUI;
 
@@ -9,19 +11,53 @@ int main(){
         resting = 0, active, inActive, moving
     };
 
-    struct circle_t {
+    // using namespace BECS;
+
+    auto randf = [](int min, int max){
+        return 1.000f * GetRandomValue(min,max);
+    };
+
+    // Button button({{100.0f,100.f},100.0f,100.0f});
+    // Button button1({{180.0f,100.f},200.0f,500.0f});
+    // Button button2({{260.0f,100.f},700.0f,500.0f});
+
+    struct circle_t : BECS::entity_SOA_t
+    {
+        circle_t()
+        {
+            this->init_grid_space({10,10,1000.0f,1000.0f});
+        }
+
         std::vector<Vector2> pos;
         std::vector<float> radius;
         std::vector<Vector2> speed;
         std::vector<Color> color;
         std::vector<State> state;
 
-        void add(Vector2 p,float r,Vector2 s, Color c){
+        void add(Vector2 p,float r,Vector2 s, Color c)
+        {
             this->pos.push_back(p);
             this->radius.push_back(r);
             this->speed.push_back(s);
             this->color.push_back(c);
             this->state.push_back(State::active);
+
+            Rectangle bounding_box = {p.x - r, p.y - r, r*2, r*2};
+            this->register_entity(this->get_entity_id(),bounding_box);
+        }
+
+        void move(int entity_id)
+        {
+            Vector2 pos = this->pos[entity_id];
+            Vector2 speed = this->speed[entity_id];
+            float radius = this->radius[entity_id];
+
+            pos.x += speed.x;
+            pos.y += speed.y;
+
+            Rectangle bounding_box = {pos.x - radius,pos.y - radius,radius * 2,radius * 2};
+            this->update_bounding_box(entity_id,bounding_box);
+            this->update_entity_grid_position(entity_id);
         }
     };
 
@@ -29,11 +65,6 @@ int main(){
 
     auto flip_velocity = [](float& speed){
         speed *= -1;
-    };
-
-    auto move = [&](Vector2& pos, const Vector2& speed){
-        pos.x += speed.x;
-        pos.y += speed.y;
     };
 
     auto randColor = []{
@@ -53,19 +84,12 @@ int main(){
         circle.state[iterator] = State::inActive;
     };
 
-    auto randf = [](){
-        return 1.0f * GetRandomValue(-10,10);
-    };
-
     auto randVel = [&]{
-        Vector2 vec = {randf(),randf()};
+        Vector2 vec = {randf(-10,10),randf(-10,10)};
         return vec;
     };
 
-    Grid grid({10,10,window.Width,window.Height});
-
-    InitAudioDevice();
-    Sound growSoundEffect = LoadSound("sound_effects/cartoon-jump.mp3");
+    Sound_effect growSoundEffect("sound_effects/cartoon-jump.mp3");
 
     int iter = 0;
     int iter2 = 0;
@@ -86,34 +110,38 @@ int main(){
                 if (pos.x + radius >= window.Width){
                     flip_velocity(speed.x);
                     pos.x -= 1.0f;
+                    growSoundEffect.play();
                 } 
                 else if (pos.x - radius <= 0.0f){
                     flip_velocity(speed.x);
                     pos.x += 1.0f;
+                    growSoundEffect.play();
                 }
 
                 if (pos.y - radius <= 0.0f){
                     flip_velocity(speed.y);
                     pos.y += 1.0f;
+                    growSoundEffect.play();
                 } 
                 else if (pos.y + radius >= window.Height){
                     flip_velocity(speed.y);
                     pos.y -= 1.0f;
+                    growSoundEffect.play();
                 } 
                 else if (pos.y + radius <= window.Height - 9.8f ){
                     pos.y += 9.8f; // gravity
                 } 
                 
-                move(pos,speed);
+                circle.move(iter);
 
                 //velocity / energy decay
-                // if (speed.x > 0.0f) speed.x -= 0.1f;
-                // else if (speed.x < 0.0f) speed.x += 0.1f;
-                // else speed.x = 0.0f;
+                if (speed.x > 0.0f) speed.x -= 0.1f;
+                else if (speed.x < 0.0f) speed.x += 0.1f;
+                else speed.x = 0.0f;
 
-                // if (speed.y > 0.0f) speed.y -= 0.0f;
-                // else if (speed.y < 0.0f) speed.y += 0.1f;
-                // else speed.y = 0.0f;
+                if (speed.y > 0.0f) speed.y -= 0.0f;
+                else if (speed.y < 0.0f) speed.y += 0.1f;
+                else speed.y = 0.0f;                  
 
                 //entity collision
                 // for (auto&& [pos2,radius2,speed2, color2,state2] : std::views::zip(circle.pos,circle.radius,circle.speed,circle.color,circle.state))
@@ -140,6 +168,7 @@ int main(){
         }
 
         iter = 0;
+        
     };
 
     window.canvas([&]{
@@ -147,12 +176,12 @@ int main(){
             if (state == State::active || state == State::resting) DrawCircleV(pos,radius,color);
         }
 
-        grid.drawGridTexture(zeroVector2);
-        DrawFPS(500,500);
-    });
+        circle.draw_grid();
 
-    UnloadSound(growSoundEffect);
-    CloseAudioDevice();
+        DrawFPS(500,500);
+
+        circle.clear_cells();
+    });
      
     return 0;
 }
