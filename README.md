@@ -12,7 +12,7 @@ currently uses raylib -> plans to move to webgpu(dawn) / vulkan / sokol
 
 using becs' soa ecs example: (simplified, incomplete)
 ```c++
-your_entity : becs::entity_soa_t
+struct your_entity : becs::entity_soa_t
 {
   your_entity(){
 // initializing the grid for spatial partitioning
