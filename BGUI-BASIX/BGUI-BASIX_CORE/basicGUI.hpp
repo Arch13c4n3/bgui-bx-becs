@@ -76,8 +76,15 @@ namespace BGUI {
     // (7) finish task manager in irs and drawgui
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+    // screen size defaults
+    constexpr int SCREEN_WIDTH = 1000, SCREEN_HEIGHT = 1000;
+    constexpr Vector2 zeroVector2 = {0.0f,0.0f}; 
+    constexpr Rectangle zeroRectangle = {0.0f,0.0f,0.0f,0.0f};
+    //inline Position_layout_t position_layout;
+
     // Hours:minutes:seconds in local time zone
     std::string getCurrentTime();
+
     //returns rect dimensions in single string, uses const char* for portability
     const char* formatText_RectDimensions(Rectangle rect);
 
@@ -86,17 +93,17 @@ namespace BGUI {
     };
 
     // basic ui layout positions - refers to the corners, edges and centers
-    struct Position_layout_t {
-        float top_left, 
-            top_right, 
-            top_center,
-            bottom_left,
-            bottom_right,
-            bottom_center,
-            center,
-            center_left,
-            center_right;
-    };
+    // struct Position_layout_t {
+    //     float top_left, 
+    //         top_right, 
+    //         top_center,
+    //         bottom_left,
+    //         bottom_right,
+    //         bottom_center,
+    //         center,
+    //         center_left,
+    //         center_right;
+    // };
 
     // comparison operators
     enum class Comparison : uint8_t {
@@ -164,12 +171,6 @@ namespace BGUI {
             Timer m_Timer;
             const char* m_Name;
     };
-    
-    // screen size defaults
-    constexpr int SCREEN_WIDTH = 1000, SCREEN_HEIGHT = 1000;
-    constexpr Vector2 zeroVector2 = {0.0f,0.0f}; 
-    constexpr Rectangle zeroRectangle = {0.0f,0.0f,0.0f,0.0f};
-    inline Position_layout_t position_layout;
 
     // Surface Properties Container for pre-rendered textures
     // NOTE: height should be negative to make sure its flippped correctly
@@ -292,14 +293,16 @@ namespace BGUI {
 
     // Manages Rendering Architecture
     // Works but Needs to be Improved/updated Since the current design implementation uses Work-Arounds
-    class INTERNAL_RENDERING_SYSTEM {
-        public:
+    class INTERNAL_RENDERING_SYSTEM 
+    {
+    public:
         INTERNAL_RENDERING_SYSTEM();
         // responsible for unloading render textures 
         ~INTERNAL_RENDERING_SYSTEM();
+    public: // ---- blueprint processing ----
         // stores blue prints to be rendered
         std::vector<BluePrint_t*> BLUEPRINT_STACK;
-        int BLUEPRINT_STACK_SIZE;
+        int BLUEPRINT_STACK_SIZE = 0;
         int Current_Render_Index = 0;
         void PUSH_TO_BLUEPRINT_STACK(BluePrint_t& bluePrint);
         // the final texture where all pre-renders are batched to 1 texture
@@ -310,15 +313,11 @@ namespace BGUI {
         size_t RENDERED_BLUEPRINTS_OVERLAY_STACK_SIZE;
         // draw pre rendered
         void BATCH_RENDER_BLUEPRINTS();
-
-        //---- parser interfacing ------
-
+    public: // ---- parser interfacing ------
         vm_blueprint_t* m_vm;
         //constructs the virtual model representation
         void push_vm_blueprint(vm_blueprint_t& vm);
-
-        //----Grid Space Hashing-----
-
+    public: // ---- Grid Space Hashing (UI components) -----
         float cellWidth,cellHeight;
         int Rows,Cols;
         int GUI_GRID_SIZE;
@@ -350,19 +349,16 @@ namespace BGUI {
         void HASH_BLUEPRINTS_TO_GRID();
         bool isBLUEPRINTS_HASHED = false;
         // for reducing checks at runtime
-        Vector2 mouseDelta;
+        //Vector2 mouseDelta;
         bool isMouseHovering_Component = false;
-
-        // ---- container -----
-
+    public:  // ---- container -----
         std::vector<container_prop_t*> container_prop_stack;
         void push_to_container_stack(container_prop_t *container);
-
-        // -----task manager-----
+    //public:    // -----task manager-----
         // for efficiently managing task load in DRAWGUI
-        std::vector<task_t*> activeTask_stack;
-        std::vector<task_t*> inActiveTask_stack;
-        void push_to_task_stack(task_t& stack);
+        // std::vector<task_t*> activeTask_stack;
+        // std::vector<task_t*> inActiveTask_stack;
+        // void push_to_task_stack(task_t& stack);
     };
 
     // a global IRS instance for the BGUI to interface with
@@ -392,13 +388,13 @@ namespace BGUI {
         int Fps = 60;
 
         // sets the values for basic ui layout
-        void set_gui_layout_defaults();
+        //void set_gui_layout_defaults();
 
         // triggers when window is closed
         void onWindowClose();   
 
         // creates the grid space, necessary for spatial hashing of objects
-        void init_grid_space(int rows = 10, int cols = 10);
+        void init_gui_grid_space(int rows = 10, int cols = 10);
 
         // manages game loop logic and drawing
         std::function<void()> logic;
@@ -422,8 +418,8 @@ namespace BGUI {
             }
         }
 
-        task_t isGUI_BATCHED_task;
-        void checkGUI_batched_status();
+        //task_t isGUI_BATCHED_task;
+        //void checkGUI_batched_status();
 
         // --- tick system ---
         // sets the ticks per second and starts a tick clock 
@@ -441,10 +437,7 @@ namespace BGUI {
         void update_tick_clock();
         // logic that updates per specified tick
         void update_perTick(const int& tickSpeed, std::function<void()> logic);
-        //void interpolate_position(Vector2& start, Vector2 end, int tick);     
-
-        private:
-        
+        // void interpolate_position(Vector2& start, Vector2 end, int tick);       
     };
 
     class Sound_effect {
@@ -558,7 +551,6 @@ namespace BGUI {
     };
 
     // ---------------- parser -------------------
-
     //basic design language interface
     class BDL {
         public:
