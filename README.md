@@ -10,10 +10,14 @@ these headers are designed to be self contained with some seemeless interoptabil
 
 currently uses raylib -> plans to move to webgpu(dawn) / vulkan / sokol
 
-using becs' soa ecs example: (simplified, incomplete)
+using becs' soa example: (simplified, incomplete)
 ```c++
 struct your_entity : becs::entity_soa_t
 {
+// your entites' attributes in soa format
+  std::vector<Vector2> position;
+  //... other std::vector<> elements
+
   your_entity(){
 // initializing the grid for spatial partitioning
     becs::entity_soa_t::init_grid_space({
@@ -24,9 +28,6 @@ struct your_entity : becs::entity_soa_t
       // .... other optional properties
     });
   }
-// your entites' attributes in soa format
-  std::vector<Vector2> position;
-  //... other std::vector<> elements
 
   void spawn(Vector2 position) // for adding entities
   {
@@ -53,5 +54,61 @@ struct your_entity : becs::entity_soa_t
 
   //...
 }
+```
+
+⌀⌀ practical sample, particle simulator. large entities. fps fluctations around ~3000 
+```c++
+    struct circle_t : becs::entity_soa_t
+    {
+        std::vector<Vector2> pos;
+        std::vector<float> radius;
+        std::vector<Vector2> speed;
+        std::vector<Color> color;
+        std::vector<State> state;
+        bool isPaused = false;
+
+        circle_t()
+        {
+            const int max_entities = 10000;
+            becs::entity_soa_t::set_max_entites(max_entities);
+            becs::entity_soa_t::init_grid_space({10,10,1000.0f,1000.0f});
+            
+            pos.reserve(max_entities);
+            radius.reserve(max_entities);
+            speed.reserve(max_entities);
+            color.reserve(max_entities);
+            state.reserve(max_entities);
+        }
+
+        void spawn(Vector2 p,float r,Vector2 s, Color c)
+        {
+            this->pos.emplace_back(p);
+            this->radius.emplace_back(r);
+            this->speed.emplace_back(s);
+            this->color.emplace_back(c);
+            this->state.emplace_back(State::active);
+
+            Rectangle bounding_box = {p.x - r, p.y - r, r*2, r*2};
+
+            becs::entity_soa_t::register_entity(becs::entity_soa_t::assign_entity_id(),bounding_box);
+        }
+
+        void move(int entity_id)  
+        {
+            Vector2& pos = this->pos[entity_id];         
+            Vector2 speed = this->speed[entity_id];
+            float radius = this->radius[entity_id];
+            float r2 = radius*2;
+             
+            if (!isPaused){
+                pos.x += speed.x;
+                pos.y += speed.y;
+            }
+
+            Rectangle new_bounding_box = {pos.x - radius,pos.y - radius,r2,r2};
+
+            becs::entity_soa_t::update_entity_bounding_box(entity_id,new_bounding_box);
+        }         
+    };
 ```
 
