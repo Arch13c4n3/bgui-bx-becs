@@ -10,6 +10,7 @@ spatial partioning:
     which hashes the bounding box to the grid space 
 
 -> update registered entity bounding box if the entity changes its size or position
-    to ensure optimal collision checks via: 'update_entity_grid_position'
+    to ensure optimal collision checks via: 'update_entity_bounding_box'
 
 -> 
+
