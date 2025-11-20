@@ -4,6 +4,7 @@
 #include <iostream>
 #include <raylib.h>
 #include <vector>
+#include <functional>
 
 //basic ECS 
 namespace becs
@@ -15,7 +16,7 @@ namespace becs
         //-- optional --
         float cell_height = 0.0f;
         float cell_width = 0.0f;
-        int border_line_thickness = 1;
+        float border_line_thickness = 0.5f;
     };
 
     // grid space for entities
@@ -27,15 +28,46 @@ namespace becs
         ~Grid(); // unload textures
         grid_prop_t properties;
         std::vector<Rectangle> cells_dimensions; // contains each cells rects dimensions
-        inline void draw_texture(const Vector2& pos);
+        void draw_texture(const Vector2& pos) const;
         void create_grid(grid_prop_t grid_properties);
         bool isCreated = false;
     private:
         RenderTexture2D gridRenderTexture;
     };
 
+    // rendertexture2d handling 
+    class pre_render_texture_2d
+    {
+    public:
+        pre_render_texture_2d(){}
+
+        pre_render_texture_2d(int texture_width,int texture_height,std::function<void()> draw_call)
+        {   
+            this->render(texture_width,texture_height,draw_call);
+        }
+
+        ~pre_render_texture_2d()
+        {
+            UnloadRenderTexture(rendered_texture);
+        }
+        
+        void render(int texture_width,int texture_height,std::function<void()> draw_call)
+        {
+            rendered_texture = LoadRenderTexture(texture_width,texture_height);
+            BeginTextureMode(rendered_texture);
+            ClearBackground(BLANK);
+            draw_call();
+            EndTextureMode();
+
+            this->isPreRendered = true;
+        }
+
+        bool isPreRendered = false;
+        RenderTexture2D rendered_texture;
+    };
+
     // base ecs for structure of arrays    
-    // performance: tested on particles. noticeable fps drops at ~3000 entities
+    // NOTE: only works for a 10x10 grid for 1000x1000 layout (will be flexible soon)
     struct entity_soa_t 
     {
     public:
@@ -45,7 +77,7 @@ namespace becs
             m_bounding_box_stack.resize(m_max_entities);
 
             m_grid_size = m_grid_space.properties.rows * m_grid_space.properties.columns;
-            m_cell_entity_id_grid.resize(m_grid_size);
+           // m_cell_entity_id_grid.resize(m_grid_size);
         }
         // used to assign a unused entity id for register_entity
         inline int assign_entity_id(){
@@ -83,10 +115,10 @@ namespace becs
             const int p1_adj_d = p1_adj - p1;
             const int cell_limit = m_grid_size;
             
-            if (p1_adj_d == 0 && p1_adj == p2_adj && p1 < cell_limit) [[unlikely]] {
+            if (p1_adj_d == 0 && p1_adj == p2_adj && p1 < cell_limit) {
                 m_cell_entity_id_grid[p1].emplace_back(entity_id);
             }
-            else [[likely]] {
+            else {
                 for (int i = 0; i <= p1_adj_d; i++){
                     for (int i2 = p1 + i;i2 <= p2_adj + 1; i2 += rows){
                         if (i2 < cell_limit) m_cell_entity_id_grid[i2].emplace_back(entity_id);
@@ -102,17 +134,22 @@ namespace becs
             this->update_entity_grid_position(entity_id);
         }
 
-        inline void clear_cells(){
-            for (int i = 0;i<m_grid_size;i++)
-                m_cell_entity_id_grid[i].clear();
-        }
-
-        inline void set_max_entites(int max){
+        inline void set_max_entities(int max){
             m_max_entities = max;
         }
 
-        inline int get_entity_count(){
+        inline int get_entity_count() const {
             return s_entity_id_counter;
+        }
+        // clears internal ecs storage buffers but remain reusable
+        inline void clear_buffers(){
+            m_bounding_box_stack.clear();
+            this->clear_cells();
+        }
+
+        inline void clear_cells(){
+            for (int i = 0;i<m_grid_size;i++)
+                m_cell_entity_id_grid[i].clear();
         }
 
     public: // --------------------------- debug --------------------------------
@@ -121,19 +158,23 @@ namespace becs
 
         inline void draw_debug()
         {
-            for (int i = 0;(i < m_grid_size && this->do_show_grid);i++)
+            if (this->do_show_grid)
             {
-                if (m_cell_entity_id_grid[i].empty()){
-                    DrawRectangleLinesEx(m_grid_space.cells_dimensions[i],0.5f,WHITE);
+                for (int i = 0;i < m_grid_size ;i++)
+                {
+                    if (m_cell_entity_id_grid[i].empty()){
+                        DrawRectangleLinesEx(m_grid_space.cells_dimensions[i],0.5f,WHITE);
+                    }
+                    else {
+                        DrawText(
+                            TextFormat("%d", m_cell_entity_id_grid[i].size()),
+                            static_cast<int>(m_grid_space.cells_dimensions[i].x),
+                            static_cast<int>(m_grid_space.cells_dimensions[i].y),30,PINK
+                        );
+                    } 
                 }
-                else {
-                    DrawText(
-                        TextFormat("%d", m_cell_entity_id_grid[i].size()),
-                        static_cast<int>(m_grid_space.cells_dimensions[i].x),
-                        static_cast<int>(m_grid_space.cells_dimensions[i].y),30,PINK
-                    );
-                    DrawRectangleLinesEx(m_grid_space.cells_dimensions[i],0.5f,BLUE); 
-                } 
+
+                m_grid_space.draw_texture({0.0f,0.0f});
             }
 
             if (this->do_show_bounding_box){
@@ -149,7 +190,7 @@ namespace becs
         int m_max_entities = 100;
         mutable std::vector<Rectangle> m_bounding_box_stack;
         //std::vector<int> active_entity_id;
-        mutable std::vector<std::vector<int>> m_cell_entity_id_grid;
+        mutable std::vector<int> m_cell_entity_id_grid[100];
         Grid m_grid_space;
         int m_grid_size = 0;
     };
