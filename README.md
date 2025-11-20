@@ -10,7 +10,7 @@ these headers are designed to be self contained with some seemeless interoptabil
 
 currently uses raylib -> plans to move to webgpu(dawn) / vulkan / sokol
 
-using becs' soa example: (simplified, incomplete)
+Using becs' soa example: (simplified, incomplete)
 ```c++
 struct your_entity : becs::entity_soa_t
 {
@@ -56,7 +56,7 @@ struct your_entity : becs::entity_soa_t
 }
 ```
 
-⌀⌀ practical sample, particle simulator. large entities. fps fluctations around ~3000 
+⌀⌀ Practical sample, particle simulator. large entities. fps fluctations around ~3000 
 ```c++
     struct circle_t : becs::entity_soa_t
     {
@@ -111,7 +111,7 @@ struct your_entity : becs::entity_soa_t
         }         
     };
 ```
-💅 optimized version of a practical example: easily surpassed 10,000 entities at stable 60 fps
+💅 Optimized version of a practical example: easily surpassed 10,000 entities at stable 60 fps
 ```c++
 // large entities sample
     // ----- pre render circles -----
