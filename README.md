@@ -111,4 +111,83 @@ struct your_entity : becs::entity_soa_t
         }         
     };
 ```
+💅 optimized version of a practical example: easily surpassed 10,000 entities at stable 60 fps
+```c++
+// large entities sample
+    // ----- pre render circles -----
+    const int max_circle_color = 5;
+    becs::pre_render_texture_2d circle_texture[max_circle_color];
+    const float def_radius = 5.0f;
+    const int def_r2 = static_cast<int>(def_radius*2);
+
+    for (int i = 0;i<max_circle_color;i++)
+    {
+        circle_texture[i].render(def_r2,def_r2,[&]{
+            DrawCircleV({def_radius,def_radius}, def_radius,get_color(i+1));
+        });
+    }
+
+struct circle_t : becs::entity_soa_t
+    {
+        std::vector<Vector2> pos;
+        std::vector<int> color_id_stack;
+
+        std::vector<float> radius;
+        std::vector<Vector2> speed;
+        std::vector<Color> color;
+        std::vector<State> state;
+        bool isPaused = false;
+
+        circle_t()
+        {
+            const int max_entities = 10000;
+            becs::entity_soa_t::set_max_entities(max_entities);
+            becs::entity_soa_t::init_grid_space({10,10,1000.0f,1000.0f});
+            
+            pos.reserve(max_entities);
+
+            radius.reserve(max_entities);
+            speed.reserve(max_entities);
+            color.reserve(max_entities);
+            state.reserve(max_entities);
+        }
+
+        void spawn(Vector2 p,float r,Vector2 s, int color_id)
+        {
+            this->pos.emplace_back(p);
+            this->radius.emplace_back(r);
+            this->speed.emplace_back(s);
+            this->color_id_stack.emplace_back(color_id);
+            this->state.emplace_back(State::active);
+
+            Rectangle bounding_box = {p.x - r, p.y - r, r*2, r*2};
+
+            becs::entity_soa_t::register_entity(becs::entity_soa_t::assign_entity_id(),bounding_box);
+        }
+
+        void move(int entity_id)  
+        {
+            Vector2& pos = this->pos[entity_id];         
+            const Vector2 speed = this->speed[entity_id];
+            const float radius = this->radius[entity_id];
+            const float r2 = radius*2;
+             
+            if (!isPaused){
+                pos.x += speed.x;
+                pos.y += speed.y;
+            }
+
+            Rectangle new_bounding_box = {pos.x - radius,pos.y - radius,r2,r2};
+
+            becs::entity_soa_t::update_entity_bounding_box(entity_id,new_bounding_box);
+        }         
+
+        void clear_attributes()
+        {
+            this->pos.clear();
+            becs::entity_soa_t::clear_buffers();
+        }
+    };
+```
+
 
