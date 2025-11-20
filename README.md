@@ -131,10 +131,8 @@ struct circle_t : becs::entity_soa_t
     {
         std::vector<Vector2> pos;
         std::vector<int> color_id_stack;
-
         std::vector<float> radius;
         std::vector<Vector2> speed;
-        std::vector<Color> color;
         std::vector<State> state;
         bool isPaused = false;
 
@@ -145,10 +143,9 @@ struct circle_t : becs::entity_soa_t
             becs::entity_soa_t::init_grid_space({10,10,1000.0f,1000.0f});
             
             pos.reserve(max_entities);
-
+            color_id_stack.reserve(max_entities);
             radius.reserve(max_entities);
             speed.reserve(max_entities);
-            color.reserve(max_entities);
             state.reserve(max_entities);
         }
 
